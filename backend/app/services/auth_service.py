@@ -2,21 +2,18 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.schemas.auth import UserRegister
-from app.core.security import hash_password
+from app.core.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+)
 
 
 class AuthService:
-    """
-    Business logic for authentication.
-    """
 
     @staticmethod
-    def register_user(db: Session, user_data: UserRegister) -> User:
-        """
-        Register a new user.
-        """
+    def register_user(db: Session, user_data: UserRegister):
 
-        # Check if email already exists
         existing_email = (
             db.query(User)
             .filter(User.email == user_data.email)
@@ -26,7 +23,6 @@ class AuthService:
         if existing_email:
             raise ValueError("Email already registered.")
 
-        # Check if phone already exists
         existing_phone = (
             db.query(User)
             .filter(User.phone == user_data.phone)
@@ -36,14 +32,14 @@ class AuthService:
         if existing_phone:
             raise ValueError("Phone number already registered.")
 
-        # Create new user
+        hashed_password = hash_password(user_data.password)
+
         new_user = User(
             full_name=user_data.full_name,
             email=user_data.email,
             phone=user_data.phone,
-            password=hash_password(user_data.password),
+            password=hashed_password,
             role=user_data.role,
-            is_active=True,
         )
 
         db.add(new_user)
@@ -51,3 +47,38 @@ class AuthService:
         db.refresh(new_user)
 
         return new_user
+
+
+    @staticmethod
+    def login_user(
+        db: Session,
+        email: str,
+        password: str,
+    ):
+
+        user = (
+            db.query(User)
+            .filter(User.email == email)
+            .first()
+        )
+
+        if not user:
+            raise ValueError("Invalid email or password.")
+
+        if not verify_password(
+            password,
+            user.password,
+        ):
+            raise ValueError("Invalid email or password.")
+
+        access_token = create_access_token(
+            data={
+                "sub": str(user.id),
+                "role": user.role,
+            }
+        )
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+        }
