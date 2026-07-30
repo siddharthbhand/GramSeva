@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 
+from app.api.auth import router as auth_router
 from app.core.config import settings
 from app.db.database import Base, engine
 
-# Import all models here
+# Import all models
 from app.models.user import User
 
 app = FastAPI(
@@ -11,17 +12,23 @@ app = FastAPI(
     version=settings.VERSION
 )
 
-# Create all database tables
+# Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Include API Routers
+app.include_router(
+    auth_router,
+    prefix="/auth",
+    tags=["Authentication"]
+)
 
 
 @app.get("/")
 def home():
     return {
-        "message": "Welcome to GramSeva API 🚀"
+        "message": "Welcome to GramSeva API"
     }
 
-from app.core.config import settings
 
 @app.get("/check-env")
 def check_env():
@@ -37,6 +44,5 @@ def check_env():
 @app.get("/test-db")
 def test_db():
     return {
-        "message": "Database Connected Successfully ✅"
+        "message": "Database Connected Successfully"
     }
-
