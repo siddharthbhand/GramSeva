@@ -24,11 +24,7 @@ app.include_router(
 )
 
 # User Management Routes
-app.include_router(
-    users_router,
-    prefix="/users",
-    tags=["Users"]
-)
+app.include_router(users_router)
 
 
 @app.get("/")
