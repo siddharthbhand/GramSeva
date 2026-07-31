@@ -1,0 +1,136 @@
+# Phase 6 – User Management
+
+## 📌 Objective
+
+Develop a secure and production-ready User Management module with complete CRUD operations, JWT Authentication, Role-Based Access Control (RBAC), input validation, and Soft Delete functionality.
+
+---
+
+## ✅ Features Implemented
+
+### 🔐 Authentication Integration
+
+- JWT-based authentication for protected APIs.
+- Current logged-in user retrieval using JWT.
+- Protected endpoints using OAuth2 Password Bearer.
+
+---
+
+### 👥 Role-Based Access Control (RBAC)
+
+- Admin-only access for User Management APIs.
+- Citizens cannot access administrative endpoints.
+- Proper HTTP 403 responses for unauthorized access.
+
+---
+
+### 📋 User Management APIs
+
+#### Get All Users
+
+- Retrieve all registered users.
+- Accessible only by Admin.
+
+#### Get User By ID
+
+- Retrieve a specific user's details.
+- Returns **404 Not Found** if the user does not exist.
+
+#### Update User
+
+Supports updating:
+
+- Full Name
+- Phone Number
+- Role
+- Active Status
+
+Validation:
+
+- Duplicate phone number check
+- User existence validation
+
+#### Soft Delete User
+
+Implemented Soft Delete using the `is_active` field.
+
+Instead of permanently deleting a user:
+
+- `is_active = false`
+- User data remains in the database.
+- Supports future account restoration.
+- Prevents accidental data loss.
+- Prevents multiple deactivation requests.
+
+---
+
+## ✅ Validations Implemented
+
+- User existence validation
+- Duplicate phone number validation
+- Admin authorization validation
+- Already deactivated user validation
+- Proper HTTP status codes
+
+---
+
+## 🔒 Security Features
+
+- JWT Authentication
+- OAuth2 Password Bearer
+- Role-Based Authorization
+- Protected API routes
+- Unauthorized request handling
+
+---
+
+## 🚀 Production Improvements
+
+- Replaced Hard Delete with Soft Delete
+- Preserved historical user records
+- Clean Service Layer architecture
+- Proper exception handling
+- Modular code structure
+
+---
+
+## 📡 APIs Completed
+
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/users` | Get all users |
+| GET | `/users/{user_id}` | Get user by ID |
+| PUT | `/users/{user_id}` | Update user |
+| DELETE | `/users/{user_id}` | Soft Delete (Deactivate User) |
+
+---
+
+## 🧪 Testing Completed
+
+- ✅ User Registration
+- ✅ User Login
+- ✅ JWT Authentication
+- ✅ Current Logged-in User API
+- ✅ Get All Users
+- ✅ Get User By ID
+- ✅ Update User
+- ✅ Duplicate Phone Validation
+- ✅ Soft Delete User
+- ✅ Already Deactivated User Validation
+- ✅ Role-Based Access Control
+- ✅ Swagger API Testing
+- ✅ MySQL Database Verification
+
+---
+
+## 🎯 Outcome
+
+Successfully developed a production-ready User Management module with:
+
+- Secure JWT Authentication
+- Role-Based Access Control (RBAC)
+- Complete CRUD Operations
+- Input Validation
+- Soft Delete Implementation
+- Swagger API Testing
+- Enterprise-ready architecture
