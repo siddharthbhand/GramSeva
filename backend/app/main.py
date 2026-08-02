@@ -2,29 +2,49 @@ from fastapi import FastAPI
 
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
+from app.api.departments import router as department_router
+
 from app.core.config import settings
 from app.db.database import Base, engine
 
 # Import all models
 from app.models.user import User
+from app.models.department import Department
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version=settings.VERSION
+    version=settings.VERSION,
 )
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+# ============================
 # Authentication Routes
+# ============================
+
 app.include_router(
     auth_router,
     prefix="/auth",
-    tags=["Authentication"]
+    tags=["Authentication"],
 )
 
+# ============================
 # User Management Routes
+# ============================
+
 app.include_router(users_router)
+
+# ============================
+# Department Management Routes
+# ============================
+
+app.include_router(
+    department_router,
+    prefix="/departments",
+    tags=["Departments"],
+)
 
 
 @app.get("/")
