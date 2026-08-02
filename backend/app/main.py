@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 from app.api.departments import router as department_router
+from app.api.complaints import router as complaint_router
 
 from app.core.config import settings
 from app.db.database import Base, engine
@@ -10,6 +11,7 @@ from app.db.database import Base, engine
 # Import all models
 from app.models.user import User
 from app.models.department import Department
+from app.models.complaint import Complaint
 
 
 app = FastAPI(
@@ -21,7 +23,7 @@ app = FastAPI(
 Base.metadata.create_all(bind=engine)
 
 # ============================
-# Authentication Routes
+# Authentication
 # ============================
 
 app.include_router(
@@ -31,21 +33,26 @@ app.include_router(
 )
 
 # ============================
-# User Management Routes
+# User Management
 # ============================
 
 app.include_router(users_router)
 
 # ============================
-# Department Management Routes
+# Department Management
 # ============================
 
-app.include_router(
-    department_router,
-    prefix="/departments",
-    tags=["Departments"],
-)
+app.include_router(department_router)
 
+# ============================
+# Complaint Management
+# ============================
+
+app.include_router(complaint_router)
+
+# ============================
+# Default Routes
+# ============================
 
 @app.get("/")
 def home():

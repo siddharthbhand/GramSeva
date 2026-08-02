@@ -23,6 +23,7 @@ from app.db.database import Base
 # Import all models here
 from app.models.user import User
 from app.models.department import Department
+from app.models.complaint import Complaint
 
 # -------------------------------------------------------
 # Alembic Configuration

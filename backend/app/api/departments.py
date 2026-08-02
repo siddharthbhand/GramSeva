@@ -14,7 +14,10 @@ from app.schemas.department import (
 )
 from app.services.department_service import DepartmentService
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/departments",
+    tags=["Departments"],
+)
 
 
 @router.post(
@@ -27,8 +30,8 @@ def create_department(
     _: User = Depends(require_admin),
 ):
     return DepartmentService.create_department(
-        db,
-        department_data,
+        db=db,
+        department_data=department_data,
     )
 
 
@@ -53,8 +56,8 @@ def get_department_by_id(
     _: User = Depends(require_admin),
 ):
     return DepartmentService.get_department_by_id(
-        db,
-        department_id,
+        db=db,
+        department_id=department_id,
     )
 
 
@@ -69,19 +72,21 @@ def update_department(
     _: User = Depends(require_admin),
 ):
     return DepartmentService.update_department(
-        db,
-        department_id,
-        department_data,
+        db=db,
+        department_id=department_id,
+        department_data=department_data,
     )
 
 
-@router.delete("/{department_id}")
+@router.delete(
+    "/{department_id}",
+)
 def delete_department(
     department_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
     return DepartmentService.delete_department(
-        db,
-        department_id,
+        db=db,
+        department_id=department_id,
     )
