@@ -6,6 +6,7 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.database import Base
@@ -46,4 +47,13 @@ class Department(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+    # ============================
+    # Relationships
+    # ============================
+
+    complaints = relationship(
+        "Complaint",
+        back_populates="department",
     )

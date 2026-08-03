@@ -62,17 +62,23 @@ class ComplaintAssignment(Base):
         onupdate=func.now(),
     )
 
+    # ============================
+    # Relationships
+    # ============================
+
     complaint = relationship(
         "Complaint",
-        foreign_keys=[complaint_id],
+        back_populates="assignments",
     )
 
     officer = relationship(
         "User",
         foreign_keys=[officer_id],
+        back_populates="assigned_complaints",
     )
 
     assigned_by_user = relationship(
         "User",
         foreign_keys=[assigned_by],
+        back_populates="created_assignments",
     )

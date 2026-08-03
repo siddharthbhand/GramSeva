@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
+from app.core.enums import ComplaintStatus
+
 
 class ComplaintCreate(BaseModel):
     title: str
@@ -13,10 +15,14 @@ class ComplaintUpdate(BaseModel):
     title: str
     description: str
     location: str
-    status: str
+    status: ComplaintStatus
     priority: str
     department_id: int | None = None
     is_active: bool
+
+
+class ComplaintStatusUpdate(BaseModel):
+    status: ComplaintStatus
 
 
 class ComplaintResponse(BaseModel):
@@ -24,7 +30,7 @@ class ComplaintResponse(BaseModel):
     title: str
     description: str
     location: str
-    status: str
+    status: ComplaintStatus
     priority: str
     citizen_id: int
     department_id: int | None
@@ -38,7 +44,7 @@ class ComplaintResponse(BaseModel):
 class ComplaintListResponse(BaseModel):
     id: int
     title: str
-    status: str
+    status: ComplaintStatus
     priority: str
     citizen_id: int
     department_id: int | None

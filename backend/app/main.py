@@ -7,6 +7,9 @@ from app.api.complaints import router as complaint_router
 from app.api.complaint_assignments import (
     router as complaint_assignment_router,
 )
+from app.api.complaint_history import (
+    router as complaint_history_router,
+)
 
 from app.core.config import settings
 from app.db.database import Base, engine
@@ -16,6 +19,7 @@ from app.models.user import User
 from app.models.department import Department
 from app.models.complaint import Complaint
 from app.models.complaint_assignment import ComplaintAssignment
+from app.models.complaint_history import ComplaintHistory
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -58,7 +62,15 @@ app.include_router(complaint_router)
 # ============================
 
 app.include_router(
-    complaint_assignment_router
+    complaint_assignment_router,
+)
+
+# ============================
+# Complaint History Management
+# ============================
+
+app.include_router(
+    complaint_history_router,
 )
 
 # ============================

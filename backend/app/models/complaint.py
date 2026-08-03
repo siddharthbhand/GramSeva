@@ -6,28 +6,43 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Enum,
 )
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.db.database import Base
+from app.core.enums import ComplaintStatus
 
 
 class Complaint(Base):
     __tablename__ = "complaints"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
-    title = Column(String(255), nullable=False)
+    title = Column(
+        String(255),
+        nullable=False,
+    )
 
-    description = Column(Text, nullable=False)
+    description = Column(
+        Text,
+        nullable=False,
+    )
 
-    location = Column(String(255), nullable=False)
+    location = Column(
+        String(255),
+        nullable=False,
+    )
 
     status = Column(
-        String(50),
+        Enum(ComplaintStatus),
         nullable=False,
-        default="Pending",
+        default=ComplaintStatus.PENDING,
     )
 
     priority = Column(
@@ -65,14 +80,29 @@ class Complaint(Base):
         onupdate=func.now(),
     )
 
+    # =====================================================
     # Relationships
+    # =====================================================
 
-citizen = relationship(
-    "User",
-    back_populates="complaints",
-)
+    citizen = relationship(
+        "User",
+        back_populates="complaints",
+        foreign_keys=[citizen_id],
+    )
 
-department = relationship(
-    "Department",
-    back_populates="complaints",
-)
+    department = relationship(
+        "Department",
+        back_populates="complaints",
+    )
+
+    assignments = relationship(
+        "ComplaintAssignment",
+        back_populates="complaint",
+        cascade="all, delete-orphan",
+    )
+
+    history = relationship(
+        "ComplaintHistory",
+        back_populates="complaint",
+        cascade="all, delete-orphan",
+    )
