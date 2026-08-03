@@ -4,6 +4,9 @@ from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 from app.api.departments import router as department_router
 from app.api.complaints import router as complaint_router
+from app.api.complaint_assignments import (
+    router as complaint_assignment_router,
+)
 
 from app.core.config import settings
 from app.db.database import Base, engine
@@ -12,7 +15,7 @@ from app.db.database import Base, engine
 from app.models.user import User
 from app.models.department import Department
 from app.models.complaint import Complaint
-
+from app.models.complaint_assignment import ComplaintAssignment
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -49,6 +52,14 @@ app.include_router(department_router)
 # ============================
 
 app.include_router(complaint_router)
+
+# ============================
+# Complaint Assignment Management
+# ============================
+
+app.include_router(
+    complaint_assignment_router
+)
 
 # ============================
 # Default Routes
