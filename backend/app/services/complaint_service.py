@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -48,6 +50,13 @@ class ComplaintService:
                     detail="Department not found.",
                 )
 
+        # =====================================================
+        # SLA Calculation
+        # =====================================================
+
+        sla_hours = 24
+        sla_due_at = datetime.utcnow() + timedelta(hours=sla_hours)
+
         complaint = Complaint(
             title=complaint_data.title,
             description=complaint_data.description,
@@ -56,6 +65,11 @@ class ComplaintService:
             priority=complaint_data.priority,
             citizen_id=citizen_id,
             department_id=complaint_data.department_id,
+
+            # SLA Fields
+            sla_hours=sla_hours,
+            sla_due_at=sla_due_at,
+            is_sla_breached=False,
         )
 
         db.add(complaint)

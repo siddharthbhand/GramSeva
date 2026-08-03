@@ -69,6 +69,27 @@ class Complaint(Base):
         nullable=False,
     )
 
+    # =====================================================
+    # SLA Management Fields
+    # =====================================================
+
+    sla_hours = Column(
+        Integer,
+        nullable=False,
+        default=24,
+    )
+
+    sla_due_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    is_sla_breached = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
