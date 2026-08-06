@@ -15,6 +15,7 @@ from app.schemas.complaint import (
     ComplaintResponse,
     ComplaintListResponse,
     ComplaintStatusUpdate,
+    ComplaintSLAResponse,
 )
 
 from app.services.complaint_service import ComplaintService
@@ -58,6 +59,48 @@ def get_all_complaints(
     db: Session = Depends(get_db),
 ):
     return ComplaintService.get_all_complaints(db)
+
+
+# =====================================================
+# Get All Complaints SLA Details
+# =====================================================
+
+@router.get(
+    "/sla",
+    response_model=List[ComplaintSLAResponse],
+)
+def get_all_complaints_sla(
+    db: Session = Depends(get_db),
+):
+    return ComplaintService.get_all_complaints_sla(db)
+
+
+# =====================================================
+# Get Near Breach Complaints
+# =====================================================
+
+@router.get(
+    "/near-breach",
+    response_model=List[ComplaintSLAResponse],
+)
+def get_near_breach_complaints(
+    db: Session = Depends(get_db),
+):
+    return ComplaintService.get_near_breach_complaints(db)
+
+
+# =====================================================
+# Get Breached Complaints
+# =====================================================
+
+@router.get(
+    "/breached",
+    response_model=List[ComplaintSLAResponse],
+)
+def get_breached_complaints(
+    db: Session = Depends(get_db),
+):
+    return ComplaintService.get_breached_complaints(db)
 
 
 # =====================================================

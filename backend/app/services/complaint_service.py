@@ -13,9 +13,11 @@ from app.schemas.complaint import (
     ComplaintCreate,
     ComplaintUpdate,
     ComplaintStatusUpdate,
+    ComplaintSLAResponse,
 )
 
 from app.services.complaint_history_service import ComplaintHistoryService
+from app.utils.sla import SLAUtils
 
 
 class ComplaintService:
@@ -65,8 +67,6 @@ class ComplaintService:
             priority=complaint_data.priority,
             citizen_id=citizen_id,
             department_id=complaint_data.department_id,
-
-            # SLA Fields
             sla_hours=sla_hours,
             sla_due_at=sla_due_at,
             is_sla_breached=False,
@@ -93,6 +93,143 @@ class ComplaintService:
             .order_by(Complaint.id)
             .all()
         )
+
+    # =====================================================
+    # Get All Complaints SLA Details
+    # =====================================================
+
+    @staticmethod
+    def get_all_complaints_sla(db: Session):
+
+        complaints = (
+            db.query(Complaint)
+            .filter(
+                Complaint.is_active == True,
+            )
+            .order_by(Complaint.id)
+            .all()
+        )
+
+        result = []
+
+        for complaint in complaints:
+
+            result.append(
+                ComplaintSLAResponse(
+                    id=complaint.id,
+                    title=complaint.title,
+                    status=complaint.status,
+                    priority=complaint.priority,
+                    citizen_id=complaint.citizen_id,
+                    department_id=complaint.department_id,
+                    sla_hours=complaint.sla_hours,
+                    sla_due_at=complaint.sla_due_at,
+                    is_sla_breached=SLAUtils.is_breached(
+                        complaint.sla_due_at
+                    ),
+                    remaining_hours=round(
+                        SLAUtils.get_remaining_hours(
+                            complaint.sla_due_at
+                        ),
+                        2,
+                    ),
+                    sla_status=SLAUtils.get_sla_status(
+                        complaint.sla_due_at
+                    ),
+                )
+            )
+
+        return result
+
+        # =====================================================
+    # Get Near Breach Complaints
+    # =====================================================
+
+    @staticmethod
+    def get_near_breach_complaints(db: Session):
+
+        complaints = (
+            db.query(Complaint)
+            .filter(
+                Complaint.is_active == True,
+            )
+            .order_by(Complaint.id)
+            .all()
+        )
+
+        result = []
+
+        for complaint in complaints:
+
+            if SLAUtils.is_near_breach(complaint.sla_due_at):
+
+                result.append(
+                    ComplaintSLAResponse(
+                        id=complaint.id,
+                        title=complaint.title,
+                        status=complaint.status,
+                        priority=complaint.priority,
+                        citizen_id=complaint.citizen_id,
+                        department_id=complaint.department_id,
+                        sla_hours=complaint.sla_hours,
+                        sla_due_at=complaint.sla_due_at,
+                        is_sla_breached=False,
+                        remaining_hours=round(
+                            SLAUtils.get_remaining_hours(
+                                complaint.sla_due_at
+                            ),
+                            2,
+                        ),
+                        sla_status="Near Breach",
+                    )
+                )
+
+        return result
+
+    # =====================================================
+    # Get Breached Complaints
+    # =====================================================
+
+    @staticmethod
+    def get_breached_complaints(db: Session):
+
+        complaints = (
+            db.query(Complaint)
+            .filter(
+                Complaint.is_active == True,
+            )
+            .order_by(Complaint.id)
+            .all()
+        )
+
+        result = []
+
+        for complaint in complaints:
+
+            if SLAUtils.is_breached(complaint.sla_due_at):
+
+                result.append(
+                    ComplaintSLAResponse(
+                        id=complaint.id,
+                        title=complaint.title,
+                        status=complaint.status,
+                        priority=complaint.priority,
+                        citizen_id=complaint.citizen_id,
+                        department_id=complaint.department_id,
+                        sla_hours=complaint.sla_hours,
+                        sla_due_at=complaint.sla_due_at,
+                        is_sla_breached=True,
+                        remaining_hours=round(
+                            SLAUtils.get_remaining_hours(
+                                complaint.sla_due_at
+                            ),
+                            2,
+                        ),
+                        sla_status="Breached",
+                    )
+                )
+
+        return result
 
     # =====================================================
     # Get Complaint By ID

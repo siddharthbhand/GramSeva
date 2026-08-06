@@ -91,3 +91,34 @@ class ComplaintListResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+    # =====================================================
+# SLA Response Schema
+# =====================================================
+
+class ComplaintSLAResponse(BaseModel):
+    id: int
+    title: str
+    status: ComplaintStatus
+    priority: str
+    citizen_id: int
+    department_id: int | None
+
+    sla_hours: int
+    sla_due_at: datetime | None
+    is_sla_breached: bool
+
+    remaining_hours: float
+    sla_status: str
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+
+# =====================================================
+# SLA List Response
+# =====================================================
+
+class ComplaintSLAListResponse(BaseModel):
+    complaints: list[ComplaintSLAResponse]
