@@ -65,3 +65,19 @@ class User(BaseModel):
         "ComplaintHistory",
         back_populates="changed_by_user",
     )
+
+    # =====================================================
+    # Complaint Escalation Relationships
+    # =====================================================
+
+    escalations_received = relationship(
+        "ComplaintEscalation",
+        foreign_keys="ComplaintEscalation.escalated_to",
+        back_populates="escalated_to_user",
+    )
+
+    escalations_created = relationship(
+        "ComplaintEscalation",
+        foreign_keys="ComplaintEscalation.escalated_by",
+        back_populates="escalated_by_user",
+    )

@@ -27,6 +27,7 @@ from app.models.department import Department
 from app.models.complaint import Complaint
 from app.models.complaint_assignment import ComplaintAssignment
 from app.models.complaint_history import ComplaintHistory
+from app.models.complaint_escalation import ComplaintEscalation
 # -------------------------------------------------------
 # Alembic Configuration
 # -------------------------------------------------------

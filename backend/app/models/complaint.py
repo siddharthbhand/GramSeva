@@ -127,3 +127,13 @@ class Complaint(Base):
         back_populates="complaint",
         cascade="all, delete-orphan",
     )
+
+    # =====================================================
+    # Escalation Relationship
+    # =====================================================
+
+    escalations = relationship(
+        "ComplaintEscalation",
+        back_populates="complaint",
+        cascade="all, delete-orphan",
+    )
