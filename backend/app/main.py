@@ -17,6 +17,10 @@ from app.api.complaint_escalation import (
     router as complaint_escalation_router,
 )
 
+from app.api.notification import (
+    router as notification_router,
+)
+
 from app.core.config import settings
 from app.db.database import Base, engine
 
@@ -31,6 +35,7 @@ from app.models.complaint import Complaint
 from app.models.complaint_assignment import ComplaintAssignment
 from app.models.complaint_history import ComplaintHistory
 from app.models.complaint_escalation import ComplaintEscalation
+from app.models.notification import Notification
 
 
 # =====================================================
@@ -112,6 +117,15 @@ app.include_router(
 
 app.include_router(
     complaint_escalation_router,
+)
+
+
+# =====================================================
+# Notification Management
+# =====================================================
+
+app.include_router(
+    notification_router,
 )
 
 
