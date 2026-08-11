@@ -3,11 +3,19 @@ from sqlalchemy.orm import Session
 
 from app.models.complaint import Complaint
 from app.models.complaint_assignment import ComplaintAssignment
+from app.models.notification import Notification
 from app.models.user import User
-from app.schemas.complaint_assignment import ComplaintAssignmentCreate
+
+from app.schemas.complaint_assignment import (
+    ComplaintAssignmentCreate,
+)
 
 
 class ComplaintAssignmentService:
+
+    # =====================================================
+    # Assign Complaint
+    # =====================================================
 
     @staticmethod
     def assign_complaint(
@@ -16,9 +24,9 @@ class ComplaintAssignmentService:
         assigned_by: int,
     ):
 
-        # ----------------------------
+        # -------------------------------------------------
         # Check Complaint
-        # ----------------------------
+        # -------------------------------------------------
 
         complaint = (
             db.query(Complaint)
@@ -35,9 +43,9 @@ class ComplaintAssignmentService:
                 detail="Complaint not found.",
             )
 
-        # ----------------------------
+        # -------------------------------------------------
         # Check Officer
-        # ----------------------------
+        # -------------------------------------------------
 
         officer = (
             db.query(User)
@@ -54,14 +62,15 @@ class ComplaintAssignmentService:
                 detail="Officer not found.",
             )
 
-        # ----------------------------
+        # -------------------------------------------------
         # Prevent Duplicate Assignment
-        # ----------------------------
+        # -------------------------------------------------
 
         existing_assignment = (
             db.query(ComplaintAssignment)
             .filter(
-                ComplaintAssignment.complaint_id == assignment_data.complaint_id,
+                ComplaintAssignment.complaint_id
+                == assignment_data.complaint_id,
                 ComplaintAssignment.is_active == True,
             )
             .first()
@@ -73,9 +82,9 @@ class ComplaintAssignmentService:
                 detail="Complaint is already assigned.",
             )
 
-        # ----------------------------
+        # -------------------------------------------------
         # Create Assignment
-        # ----------------------------
+        # -------------------------------------------------
 
         assignment = ComplaintAssignment(
             complaint_id=assignment_data.complaint_id,
@@ -85,7 +94,33 @@ class ComplaintAssignmentService:
         )
 
         db.add(assignment)
+
+        # -------------------------------------------------
+        # Create Assignment Notification
+        # -------------------------------------------------
+
+        notification = Notification(
+            user_id=assignment_data.officer_id,
+            complaint_id=assignment_data.complaint_id,
+            escalation_id=None,
+            title="Complaint Assigned",
+            message=(
+                f"Complaint #{assignment_data.complaint_id} "
+                "has been assigned to you for further action."
+            ),
+            notification_type="COMPLAINT_ASSIGNED",
+            is_read=False,
+            is_active=True,
+        )
+
+        db.add(notification)
+
+        # -------------------------------------------------
+        # Commit Assignment + Notification Together
+        # -------------------------------------------------
+
         db.commit()
+
         db.refresh(assignment)
 
         return assignment
@@ -95,7 +130,9 @@ class ComplaintAssignmentService:
     # =====================================================
 
     @staticmethod
-    def get_all_assignments(db: Session):
+    def get_all_assignments(
+        db: Session,
+    ):
 
         return (
             db.query(ComplaintAssignment)
@@ -143,9 +180,11 @@ class ComplaintAssignmentService:
         remarks: str,
     ):
 
-        assignment = ComplaintAssignmentService.get_assignment_by_id(
-            db,
-            assignment_id,
+        assignment = (
+            ComplaintAssignmentService.get_assignment_by_id(
+                db,
+                assignment_id,
+            )
         )
 
         assignment.remarks = remarks
@@ -165,9 +204,11 @@ class ComplaintAssignmentService:
         assignment_id: int,
     ):
 
-        assignment = ComplaintAssignmentService.get_assignment_by_id(
-            db,
-            assignment_id,
+        assignment = (
+            ComplaintAssignmentService.get_assignment_by_id(
+                db,
+                assignment_id,
+            )
         )
 
         assignment.is_active = False
