@@ -35,11 +35,12 @@ router = APIRouter(
 def get_complaint_history(
     complaint_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     return ComplaintHistoryService.get_complaint_history(
         db=db,
         complaint_id=complaint_id,
+        citizen_id=current_user.id,
     )
 
 
@@ -54,9 +55,10 @@ def get_complaint_history(
 def get_history_by_id(
     history_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     return ComplaintHistoryService.get_history_by_id(
         db=db,
         history_id=history_id,
+        citizen_id=current_user.id,
     )
