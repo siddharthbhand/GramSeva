@@ -95,6 +95,55 @@ class ComplaintService:
         )
 
     # =====================================================
+    # Get My Complaints
+    # =====================================================
+
+    @staticmethod
+    def get_my_complaints(
+        db: Session,
+        citizen_id: int,
+    ):
+
+        return (
+            db.query(Complaint)
+            .filter(
+                Complaint.citizen_id == citizen_id,
+                Complaint.is_active == True,
+            )
+            .order_by(Complaint.id.desc())
+            .all()
+        )
+
+    # =====================================================
+    # Get My Complaint By ID
+    # =====================================================
+
+    @staticmethod
+    def get_my_complaint_by_id(
+        db: Session,
+        complaint_id: int,
+        citizen_id: int,
+    ):
+
+        complaint = (
+            db.query(Complaint)
+            .filter(
+                Complaint.id == complaint_id,
+                Complaint.citizen_id == citizen_id,
+                Complaint.is_active == True,
+            )
+            .first()
+        )
+
+        if not complaint:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Complaint not found.",
+            )
+
+        return complaint
+
+    # =====================================================
     # Get All Complaints SLA Details
     # =====================================================
 
@@ -141,7 +190,7 @@ class ComplaintService:
 
         return result
 
-        # =====================================================
+    # =====================================================
     # Get Near Breach Complaints
     # =====================================================
 
@@ -369,7 +418,10 @@ class ComplaintService:
             old_status=old_status,
             new_status=new_status,
             changed_by=changed_by,
-            remarks=f"Status changed from {old_status.value} to {new_status.value}",
+            remarks=(
+                f"Status changed from "
+                f"{old_status.value} to {new_status.value}"
+            ),
         )
 
         return complaint

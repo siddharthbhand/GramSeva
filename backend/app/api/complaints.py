@@ -62,6 +62,44 @@ def get_all_complaints(
 
 
 # =====================================================
+# Get My Complaints
+# =====================================================
+
+@router.get(
+    "/my",
+    response_model=List[ComplaintListResponse],
+)
+def get_my_complaints(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ComplaintService.get_my_complaints(
+        db=db,
+        citizen_id=current_user.id,
+    )
+
+
+# =====================================================
+# Get My Complaint By ID
+# =====================================================
+
+@router.get(
+    "/my/{complaint_id}",
+    response_model=ComplaintResponse,
+)
+def get_my_complaint_by_id(
+    complaint_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ComplaintService.get_my_complaint_by_id(
+        db=db,
+        complaint_id=complaint_id,
+        citizen_id=current_user.id,
+    )
+
+
+# =====================================================
 # Get All Complaints SLA Details
 # =====================================================
 
