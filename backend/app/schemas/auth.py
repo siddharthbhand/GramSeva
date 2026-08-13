@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 
+from app.core.user_roles import UserRole
+
 
 class UserRegister(BaseModel):
     """
@@ -7,10 +9,23 @@ class UserRegister(BaseModel):
     """
 
     full_name: str = Field(..., min_length=3, max_length=100)
+
     email: EmailStr
-    phone: str = Field(..., min_length=10, max_length=15)
-    password: str = Field(..., min_length=8)
-    role: str = Field(default="citizen")
+
+    phone: str = Field(
+        ...,
+        min_length=10,
+        max_length=15,
+    )
+
+    password: str = Field(
+        ...,
+        min_length=8,
+    )
+
+    role: UserRole = Field(
+        default=UserRole.CITIZEN,
+    )
 
 
 class UserLogin(BaseModel):
@@ -19,6 +34,7 @@ class UserLogin(BaseModel):
     """
 
     email: EmailStr
+
     password: str
 
 
@@ -28,8 +44,11 @@ class UserResponse(BaseModel):
     """
 
     id: int
+
     full_name: str
+
     email: EmailStr
+
     role: str
 
     model_config = {

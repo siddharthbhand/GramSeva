@@ -5,11 +5,12 @@ from sqlalchemy.orm import Session
 from app.core.enums import ComplaintStatus
 from app.models.complaint import Complaint
 from app.models.complaint_assignment import ComplaintAssignment
+from app.models.complaint_escalation import ComplaintEscalation
 from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.notification import NotificationCreate
-from app.services.complaint_escalation_service import (
-    ComplaintEscalationService,
+from app.services.escalation_hierarchy_service import (
+    EscalationHierarchyService,
 )
 from app.services.notification_service import NotificationService
 from app.utils.sla import SLAUtils
@@ -257,7 +258,8 @@ class SLAAutomationService:
         """
 
         officer = (
-            SLAAutomationService.get_active_assignment_officer(
+            SLAAutomationService
+            .get_active_assignment_officer(
                 db=db,
                 complaint_id=complaint.id,
             )
@@ -266,15 +268,20 @@ class SLAAutomationService:
         if not officer:
             return None
 
-        if SLAAutomationService.has_sla_warning_notification(
-            db=db,
-            complaint_id=complaint.id,
-            user_id=officer.id,
+        if (
+            SLAAutomationService
+            .has_sla_warning_notification(
+                db=db,
+                complaint_id=complaint.id,
+                user_id=officer.id,
+            )
         ):
             return None
 
-        remaining_hours = SLAUtils.get_remaining_hours(
-            complaint.sla_due_at
+        remaining_hours = (
+            SLAUtils.get_remaining_hours(
+                complaint.sla_due_at
+            )
         )
 
         remaining_hours = max(
@@ -344,7 +351,8 @@ class SLAAutomationService:
         """
 
         complaints = (
-            SLAAutomationService.get_near_breach_complaints(
+            SLAAutomationService
+            .get_near_breach_complaints(
                 db
             )
         )
@@ -369,6 +377,107 @@ class SLAAutomationService:
         return notifications_created
 
     # =====================================================
+    # Get Latest Escalation
+    # =====================================================
+
+    @staticmethod
+    def get_latest_escalation(
+        db: Session,
+        complaint_id: int,
+    ):
+        """
+        Return the latest active escalation for a complaint.
+        """
+
+        return (
+            db.query(ComplaintEscalation)
+            .filter(
+                ComplaintEscalation.complaint_id
+                == complaint_id,
+                ComplaintEscalation.is_active == True,
+            )
+            .order_by(
+                ComplaintEscalation.escalation_level.desc(),
+                ComplaintEscalation.id.desc(),
+            )
+            .first()
+        )
+
+    # =====================================================
+    # Create Hierarchy-Based Escalation
+    # =====================================================
+
+    @staticmethod
+    def create_hierarchy_escalation(
+        db: Session,
+        complaint: Complaint,
+    ):
+        """
+        Create an automatic escalation using the configured
+        escalation hierarchy.
+
+        Level 1 -> Department Head
+        Level 2 -> Admin
+
+        Returns None when:
+        - no next level exists
+        - no eligible target exists
+        """
+
+        (
+            next_level,
+            target_user,
+        ) = (
+            EscalationHierarchyService
+            .get_next_escalation_target(
+                db=db,
+                complaint_id=complaint.id,
+            )
+        )
+
+        if next_level is None:
+            return None
+
+        if target_user is None:
+            return None
+
+        if not (
+            EscalationHierarchyService
+            .is_valid_escalation_target(
+                user=target_user,
+                escalation_level=next_level,
+            )
+        ):
+            return None
+
+        escalation = ComplaintEscalation(
+            complaint_id=complaint.id,
+            escalation_level=next_level,
+            escalated_to=target_user.id,
+            escalated_by=None,
+            reason=(
+                "Automatic escalation due to SLA breach."
+            ),
+            remarks=(
+                "Complaint SLA deadline has been exceeded. "
+                f"System automatically escalated the complaint "
+                f"to {target_user.role} at escalation level "
+                f"{next_level}."
+            ),
+            is_active=True,
+        )
+
+        complaint.is_sla_breached = True
+
+        db.add(escalation)
+
+        db.commit()
+
+        db.refresh(escalation)
+
+        return escalation
+
+    # =====================================================
     # Create Escalation Notification
     # =====================================================
 
@@ -381,6 +490,8 @@ class SLAAutomationService:
         """
         Create a notification for the user who received
         the automatic escalation.
+
+        Duplicate notifications are prevented.
         """
 
         if escalation.escalated_to is None:
@@ -398,11 +509,14 @@ class SLAAutomationService:
         if not user:
             return None
 
-        if SLAAutomationService.has_escalation_notification(
-            db=db,
-            complaint_id=complaint.id,
-            escalation_id=escalation.id,
-            user_id=user.id,
+        if (
+            SLAAutomationService
+            .has_escalation_notification(
+                db=db,
+                complaint_id=complaint.id,
+                escalation_id=escalation.id,
+                user_id=user.id,
+            )
         ):
             return None
 
@@ -413,8 +527,8 @@ class SLAAutomationService:
             title="Complaint Escalated",
             message=(
                 f"Complaint #{complaint.id} has been "
-                f"automatically escalated due to an SLA breach. "
-                f"Escalation level: "
+                f"automatically escalated due to an "
+                f"SLA breach. Escalation level: "
                 f"{escalation.escalation_level}."
             ),
             notification_type="ESCALATION_CREATED",
@@ -437,7 +551,8 @@ class SLAAutomationService:
         """
         Process a single SLA-breached complaint.
 
-        Existing automatic escalation logic is reused.
+        The escalation hierarchy determines the next
+        escalation level and target.
         """
 
         sla_status = (
@@ -449,16 +564,53 @@ class SLAAutomationService:
         if sla_status != "Breached":
             return None
 
-        escalation = (
-            ComplaintEscalationService
-            .auto_escalate_complaint(
+        # -------------------------------------------------
+        # Prevent Duplicate Active Escalation
+        # -------------------------------------------------
+
+        latest_escalation = (
+            SLAAutomationService
+            .get_latest_escalation(
                 db=db,
                 complaint_id=complaint.id,
             )
         )
 
+        if latest_escalation:
+
+            # ---------------------------------------------
+            # Maximum hierarchy level already reached
+            # ---------------------------------------------
+
+            next_level = (
+                EscalationHierarchyService
+                .get_next_escalation_level(
+                    db=db,
+                    complaint_id=complaint.id,
+                )
+            )
+
+            if next_level is None:
+                return None
+
+        # -------------------------------------------------
+        # Create Next Hierarchy Escalation
+        # -------------------------------------------------
+
+        escalation = (
+            SLAAutomationService
+            .create_hierarchy_escalation(
+                db=db,
+                complaint=complaint,
+            )
+        )
+
         if not escalation:
             return None
+
+        # -------------------------------------------------
+        # Create Notification
+        # -------------------------------------------------
 
         notification = (
             SLAAutomationService
@@ -487,7 +639,8 @@ class SLAAutomationService:
         """
 
         complaints = (
-            SLAAutomationService.get_breached_complaints(
+            SLAAutomationService
+            .get_breached_complaints(
                 db
             )
         )
@@ -523,7 +676,8 @@ class SLAAutomationService:
         """
 
         complaints = (
-            SLAAutomationService.get_active_sla_complaints(
+            SLAAutomationService
+            .get_active_sla_complaints(
                 db
             )
         )
@@ -535,7 +689,8 @@ class SLAAutomationService:
         for complaint in complaints:
 
             sla_status = (
-                SLAAutomationService.evaluate_complaint_sla(
+                SLAAutomationService
+                .evaluate_complaint_sla(
                     complaint
                 )
             )

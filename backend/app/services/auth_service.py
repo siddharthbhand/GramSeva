@@ -11,43 +11,81 @@ from app.core.security import (
 
 class AuthService:
 
+    # =====================================================
+    # Register User
+    # =====================================================
+
     @staticmethod
-    def register_user(db: Session, user_data: UserRegister):
+    def register_user(
+        db: Session,
+        user_data: UserRegister,
+    ):
+
+        # -------------------------------------------------
+        # Check Existing Email
+        # -------------------------------------------------
 
         existing_email = (
             db.query(User)
-            .filter(User.email == user_data.email)
+            .filter(
+                User.email == user_data.email,
+            )
             .first()
         )
 
         if existing_email:
-            raise ValueError("Email already registered.")
+            raise ValueError(
+                "Email already registered."
+            )
+
+        # -------------------------------------------------
+        # Check Existing Phone
+        # -------------------------------------------------
 
         existing_phone = (
             db.query(User)
-            .filter(User.phone == user_data.phone)
+            .filter(
+                User.phone == user_data.phone,
+            )
             .first()
         )
 
         if existing_phone:
-            raise ValueError("Phone number already registered.")
+            raise ValueError(
+                "Phone number already registered."
+            )
 
-        hashed_password = hash_password(user_data.password)
+        # -------------------------------------------------
+        # Hash Password
+        # -------------------------------------------------
+
+        hashed_password = hash_password(
+            user_data.password
+        )
+
+        # -------------------------------------------------
+        # Create User
+        # -------------------------------------------------
 
         new_user = User(
             full_name=user_data.full_name,
             email=user_data.email,
             phone=user_data.phone,
             password=hashed_password,
-            role=user_data.role,
+            role=user_data.role.value,
         )
 
         db.add(new_user)
+
         db.commit()
+
         db.refresh(new_user)
 
         return new_user
 
+    # =====================================================
+    # Login User
+    # =====================================================
 
     @staticmethod
     def login_user(
@@ -56,20 +94,38 @@ class AuthService:
         password: str,
     ):
 
+        # -------------------------------------------------
+        # Find User
+        # -------------------------------------------------
+
         user = (
             db.query(User)
-            .filter(User.email == email)
+            .filter(
+                User.email == email,
+            )
             .first()
         )
 
         if not user:
-            raise ValueError("Invalid email or password.")
+            raise ValueError(
+                "Invalid email or password."
+            )
+
+        # -------------------------------------------------
+        # Verify Password
+        # -------------------------------------------------
 
         if not verify_password(
             password,
             user.password,
         ):
-            raise ValueError("Invalid email or password.")
+            raise ValueError(
+                "Invalid email or password."
+            )
+
+        # -------------------------------------------------
+        # Create JWT Token
+        # -------------------------------------------------
 
         access_token = create_access_token(
             data={
