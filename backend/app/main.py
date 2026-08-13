@@ -4,6 +4,9 @@ from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 from app.api.departments import router as department_router
 from app.api.complaints import router as complaint_router
+from app.api.admin_analytics import (
+    router as admin_analytics_router,
+)
 
 from app.api.complaint_assignments import (
     router as complaint_assignment_router,
@@ -126,6 +129,15 @@ app.include_router(
 
 app.include_router(
     notification_router,
+)
+
+
+# =====================================================
+# Admin Analytics
+# =====================================================
+
+app.include_router(
+    admin_analytics_router,
 )
 
 
