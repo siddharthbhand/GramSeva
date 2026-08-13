@@ -8,6 +8,9 @@ from app.models.complaint_assignment import ComplaintAssignment
 from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.notification import NotificationCreate
+from app.services.complaint_escalation_service import (
+    ComplaintEscalationService,
+)
 from app.services.notification_service import NotificationService
 from app.utils.sla import SLAUtils
 
@@ -159,6 +162,36 @@ class SLAAutomationService:
                 Notification.user_id == user_id,
                 Notification.notification_type
                 == "SLA_WARNING",
+                Notification.is_active == True,
+            )
+            .first()
+        )
+
+        return notification is not None
+
+    # =====================================================
+    # Check Existing Escalation Notification
+    # =====================================================
+
+    @staticmethod
+    def has_escalation_notification(
+        db: Session,
+        complaint_id: int,
+        escalation_id: int,
+        user_id: int,
+    ) -> bool:
+        """
+        Prevent duplicate escalation notifications.
+        """
+
+        notification = (
+            db.query(Notification)
+            .filter(
+                Notification.complaint_id == complaint_id,
+                Notification.escalation_id == escalation_id,
+                Notification.user_id == user_id,
+                Notification.notification_type
+                == "ESCALATION_CREATED",
                 Notification.is_active == True,
             )
             .first()
@@ -334,6 +367,147 @@ class SLAAutomationService:
                 )
 
         return notifications_created
+
+    # =====================================================
+    # Create Escalation Notification
+    # =====================================================
+
+    @staticmethod
+    def create_escalation_notification(
+        db: Session,
+        complaint: Complaint,
+        escalation,
+    ):
+        """
+        Create a notification for the user who received
+        the automatic escalation.
+        """
+
+        if escalation.escalated_to is None:
+            return None
+
+        user = (
+            db.query(User)
+            .filter(
+                User.id == escalation.escalated_to,
+                User.is_active == True,
+            )
+            .first()
+        )
+
+        if not user:
+            return None
+
+        if SLAAutomationService.has_escalation_notification(
+            db=db,
+            complaint_id=complaint.id,
+            escalation_id=escalation.id,
+            user_id=user.id,
+        ):
+            return None
+
+        notification_data = NotificationCreate(
+            user_id=user.id,
+            complaint_id=complaint.id,
+            escalation_id=escalation.id,
+            title="Complaint Escalated",
+            message=(
+                f"Complaint #{complaint.id} has been "
+                f"automatically escalated due to an SLA breach. "
+                f"Escalation level: "
+                f"{escalation.escalation_level}."
+            ),
+            notification_type="ESCALATION_CREATED",
+        )
+
+        return NotificationService.create_notification(
+            db=db,
+            notification_data=notification_data,
+        )
+
+    # =====================================================
+    # Process Breached Complaint
+    # =====================================================
+
+    @staticmethod
+    def process_breached_complaint(
+        db: Session,
+        complaint: Complaint,
+    ):
+        """
+        Process a single SLA-breached complaint.
+
+        Existing automatic escalation logic is reused.
+        """
+
+        sla_status = (
+            SLAAutomationService.evaluate_complaint_sla(
+                complaint
+            )
+        )
+
+        if sla_status != "Breached":
+            return None
+
+        escalation = (
+            ComplaintEscalationService
+            .auto_escalate_complaint(
+                db=db,
+                complaint_id=complaint.id,
+            )
+        )
+
+        if not escalation:
+            return None
+
+        notification = (
+            SLAAutomationService
+            .create_escalation_notification(
+                db=db,
+                complaint=complaint,
+                escalation=escalation,
+            )
+        )
+
+        return {
+            "escalation": escalation,
+            "notification": notification,
+        }
+
+    # =====================================================
+    # Process All Breached Complaints
+    # =====================================================
+
+    @staticmethod
+    def process_breached_complaints(
+        db: Session,
+    ):
+        """
+        Process all currently breached complaints.
+        """
+
+        complaints = (
+            SLAAutomationService.get_breached_complaints(
+                db
+            )
+        )
+
+        processed = []
+
+        for complaint in complaints:
+
+            result = (
+                SLAAutomationService
+                .process_breached_complaint(
+                    db=db,
+                    complaint=complaint,
+                )
+            )
+
+            if result:
+                processed.append(result)
+
+        return processed
 
     # =====================================================
     # Get SLA Monitoring Summary
