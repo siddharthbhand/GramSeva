@@ -121,6 +121,32 @@ class OfficerWorkloadAnalytics(BaseModel):
 
 
 # =====================================================
+# Phase 17.4
+# Escalation Analytics
+# =====================================================
+
+class EscalationAnalytics(BaseModel):
+    total: int
+    active: int
+    inactive: int
+    level_1: int
+    level_2: int
+
+
+# =====================================================
+# Phase 17.5
+# Pending & Overdue Complaint Analytics
+# =====================================================
+
+class PendingComplaintAnalytics(BaseModel):
+    total_pending: int
+    assigned_pending: int
+    unassigned_pending: int
+    within_sla: int
+    overdue: int
+
+
+# =====================================================
 # Admin Dashboard Summary
 # =====================================================
 
