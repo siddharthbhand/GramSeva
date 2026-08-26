@@ -22,10 +22,17 @@ class ComplaintCreate(BaseModel):
 # =====================================================
 
 class ComplaintUpdate(BaseModel):
+    """
+    Update general complaint information.
+
+    Status is intentionally excluded.
+    Status changes must use the dedicated status endpoint
+    so that transition and role authorization rules apply.
+    """
+
     title: str
     description: str
     location: str
-    status: ComplaintStatus
     priority: str
     department_id: int | None = None
     is_active: bool
@@ -92,8 +99,9 @@ class ComplaintListResponse(BaseModel):
         from_attributes=True,
     )
 
-    # =====================================================
-# SLA Response Schema
+
+# =====================================================
+# Complaint SLA Response
 # =====================================================
 
 class ComplaintSLAResponse(BaseModel):
@@ -117,7 +125,7 @@ class ComplaintSLAResponse(BaseModel):
 
 
 # =====================================================
-# SLA List Response
+# Complaint SLA List Response
 # =====================================================
 
 class ComplaintSLAListResponse(BaseModel):

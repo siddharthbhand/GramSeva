@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.complaint import Complaint
 from app.models.complaint_assignment import ComplaintAssignment
+from app.models.department import Department
 from app.models.notification import Notification
 from app.models.user import User
 
@@ -44,7 +45,7 @@ class ComplaintAssignmentService:
             )
 
         # -------------------------------------------------
-        # Check Officer
+        # Check Officer Exists and Is Active
         # -------------------------------------------------
 
         officer = (
@@ -60,6 +61,89 @@ class ComplaintAssignmentService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Officer not found.",
+            )
+
+        # -------------------------------------------------
+        # Validate Officer Role
+        # -------------------------------------------------
+
+        if officer.role != "officer":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected user is not an officer.",
+            )
+
+        # -------------------------------------------------
+        # Validate Complaint Department
+        # -------------------------------------------------
+
+        if complaint.department_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Complaint must be assigned to a department "
+                    "before assigning an officer."
+                ),
+            )
+
+        # -------------------------------------------------
+        # Check Complaint Department
+        # -------------------------------------------------
+
+        complaint_department = (
+            db.query(Department)
+            .filter(
+                Department.id == complaint.department_id,
+                Department.is_active == True,
+            )
+            .first()
+        )
+
+        if not complaint_department:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Complaint department not found or inactive.",
+            )
+
+        # -------------------------------------------------
+        # Validate Officer Department
+        # -------------------------------------------------
+
+        if officer.department_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Officer is not assigned to a department.",
+            )
+
+        # -------------------------------------------------
+        # Check Officer Department
+        # -------------------------------------------------
+
+        officer_department = (
+            db.query(Department)
+            .filter(
+                Department.id == officer.department_id,
+                Department.is_active == True,
+            )
+            .first()
+        )
+
+        if not officer_department:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Officer department not found or inactive.",
+            )
+
+        # -------------------------------------------------
+        # Validate Department Matching
+        # -------------------------------------------------
+
+        if complaint.department_id != officer.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Officer does not belong to the complaint's department."
+                ),
             )
 
         # -------------------------------------------------

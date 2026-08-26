@@ -1,16 +1,21 @@
-from datetime import datetime
-
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.complaint import Complaint
 from app.models.complaint_escalation import ComplaintEscalation
 from app.models.complaint_assignment import ComplaintAssignment
+from app.models.notification import Notification
 from app.models.user import User
 
 from app.schemas.complaint_escalation import (
     ComplaintEscalationCreate,
     ComplaintEscalationUpdate,
+)
+from app.services.escalation_hierarchy_service import (
+    EscalationHierarchyService,
+)
+from app.services.sla_automation_service import (
+    SLAAutomationService,
 )
 
 
@@ -41,6 +46,7 @@ class ComplaintEscalationService:
         )
 
         if not complaint:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Complaint not found.",
@@ -62,6 +68,7 @@ class ComplaintEscalationService:
             )
 
             if not escalated_user:
+
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Escalation target user not found.",
@@ -81,6 +88,7 @@ class ComplaintEscalationService:
         )
 
         if not escalating_user:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Escalating user not found.",
@@ -103,10 +111,13 @@ class ComplaintEscalationService:
         )
 
         if latest_escalation:
+
             escalation_level = (
                 latest_escalation.escalation_level + 1
             )
+
         else:
+
             escalation_level = 1
 
         # -------------------------------------------------
@@ -124,7 +135,41 @@ class ComplaintEscalationService:
         )
 
         db.add(escalation)
+
+        # -------------------------------------------------
+        # Generate Escalation ID
+        # -------------------------------------------------
+
+        db.flush()
+
+        # -------------------------------------------------
+        # Create Escalation Notification
+        # -------------------------------------------------
+
+        if escalation_data.escalated_to is not None:
+
+            notification = Notification(
+                user_id=escalation_data.escalated_to,
+                complaint_id=complaint.id,
+                escalation_id=escalation.id,
+                title="Complaint Escalated",
+                message=(
+                    f"Complaint #{complaint.id} has been "
+                    "escalated to you for further action."
+                ),
+                notification_type="COMPLAINT_ESCALATED",
+                is_read=False,
+                is_active=True,
+            )
+
+            db.add(notification)
+
+        # -------------------------------------------------
+        # Commit Escalation + Notification Together
+        # -------------------------------------------------
+
         db.commit()
+
         db.refresh(escalation)
 
         return escalation
@@ -138,10 +183,14 @@ class ComplaintEscalationService:
         db: Session,
         complaint_id: int,
     ):
+        """
+        Trigger the centralized SLA automation engine for
+        a single complaint.
 
-        # -------------------------------------------------
-        # Check Complaint
-        # -------------------------------------------------
+        The SLA automation service is the single source of
+        truth for automatic escalation hierarchy, target
+        selection, and escalation notifications.
+        """
 
         complaint = (
             db.query(Complaint)
@@ -153,134 +202,62 @@ class ComplaintEscalationService:
         )
 
         if not complaint:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Complaint not found.",
             )
 
-        # -------------------------------------------------
-        # Check SLA Due Date
-        # -------------------------------------------------
-
-        if complaint.sla_due_at is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="SLA due date is not configured for this complaint.",
+        result = (
+            SLAAutomationService
+            .process_breached_complaint(
+                db=db,
+                complaint=complaint,
             )
-
-        current_time = datetime.utcnow()
-
-        if current_time < complaint.sla_due_at:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Complaint SLA has not been breached yet.",
-            )
-
-        # -------------------------------------------------
-        # Check Existing Automatic Escalation
-        # -------------------------------------------------
-
-        existing_escalation = (
-            db.query(ComplaintEscalation)
-            .filter(
-                ComplaintEscalation.complaint_id == complaint_id,
-                ComplaintEscalation.is_active == True,
-                ComplaintEscalation.reason
-                == "Automatic escalation due to SLA breach.",
-            )
-            .first()
         )
 
-        if existing_escalation:
-            return existing_escalation
+        if result is None:
 
-        # -------------------------------------------------
-        # Find Active Complaint Assignment
-        # -------------------------------------------------
-
-        assignment = (
-            db.query(ComplaintAssignment)
-            .filter(
-                ComplaintAssignment.complaint_id == complaint_id,
-                ComplaintAssignment.is_active == True,
-            )
-            .order_by(
-                ComplaintAssignment.assigned_at.desc()
-            )
-            .first()
-        )
-
-        # -------------------------------------------------
-        # Determine Escalation Target
-        # -------------------------------------------------
-
-        escalated_to = None
-
-        if assignment:
-
-            officer = (
-                db.query(User)
-                .filter(
-                    User.id == assignment.officer_id,
-                    User.is_active == True,
+            latest_escalation = (
+                SLAAutomationService
+                .get_latest_escalation(
+                    db=db,
+                    complaint_id=complaint_id,
                 )
-                .first()
             )
 
-            if officer:
-                escalated_to = officer.id
+            if latest_escalation is not None:
 
-        # -------------------------------------------------
-        # Calculate Next Escalation Level
-        # -------------------------------------------------
+                next_level = (
+                    EscalationHierarchyService
+                    .get_next_escalation_level(
+                        db=db,
+                        complaint_id=complaint_id,
+                    )
+                )
 
-        latest_escalation = (
-            db.query(ComplaintEscalation)
-            .filter(
-                ComplaintEscalation.complaint_id == complaint_id,
+                if next_level is None:
+
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=(
+                            "No further escalation is available "
+                            "for this complaint. The maximum "
+                            "configured escalation level has "
+                            "already been reached."
+                        ),
+                    )
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Automatic escalation could not be created. "
+                    "Verify that the complaint SLA is breached "
+                    "and an eligible escalation target is available."
+                ),
             )
-            .order_by(
-                ComplaintEscalation.escalation_level.desc()
-            )
-            .first()
-        )
 
-        if latest_escalation:
-            escalation_level = (
-                latest_escalation.escalation_level + 1
-            )
-        else:
-            escalation_level = 1
-
-        # -------------------------------------------------
-        # Create Automatic Escalation
-        # -------------------------------------------------
-
-        escalation = ComplaintEscalation(
-            complaint_id=complaint_id,
-            escalation_level=escalation_level,
-            escalated_to=escalated_to,
-            escalated_by=None,
-            reason="Automatic escalation due to SLA breach.",
-            remarks=(
-                "Complaint SLA deadline has been exceeded. "
-                "System automatically escalated the complaint "
-                "to the currently assigned responsible officer."
-            ),
-            is_active=True,
-        )
-
-        # -------------------------------------------------
-        # Mark SLA As Breached
-        # -------------------------------------------------
-
-        complaint.is_sla_breached = True
-
-        db.add(escalation)
-        db.commit()
-        db.refresh(escalation)
-
-        return escalation
+        return result["escalation"]
 
     # =====================================================
     # Get Escalation By ID
@@ -302,6 +279,7 @@ class ComplaintEscalationService:
         )
 
         if not escalation:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Escalation not found.",
@@ -333,6 +311,7 @@ class ComplaintEscalationService:
         )
 
         if not complaint:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Complaint not found.",
@@ -395,6 +374,7 @@ class ComplaintEscalationService:
         )
 
         if not escalation:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Escalation not found.",
@@ -416,6 +396,7 @@ class ComplaintEscalationService:
             )
 
             if not escalated_user:
+
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Escalation target user not found.",
@@ -442,6 +423,7 @@ class ComplaintEscalationService:
         )
 
         db.commit()
+
         db.refresh(escalation)
 
         return escalation
@@ -465,12 +447,14 @@ class ComplaintEscalationService:
         )
 
         if not escalation:
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Escalation not found.",
             )
 
         if escalation.is_active is False:
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Escalation is already deactivated.",

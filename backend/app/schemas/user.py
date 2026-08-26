@@ -3,6 +3,10 @@ from pydantic import BaseModel, EmailStr, Field
 from app.core.user_roles import UserRole
 
 
+# =====================================================
+# User Update
+# =====================================================
+
 class UserUpdate(BaseModel):
     full_name: str = Field(
         ...,
@@ -18,8 +22,14 @@ class UserUpdate(BaseModel):
 
     role: UserRole
 
+    department_id: int | None = None
+
     is_active: bool
 
+
+# =====================================================
+# User List Response
+# =====================================================
 
 class UserListResponse(BaseModel):
     id: int
@@ -32,8 +42,10 @@ class UserListResponse(BaseModel):
 
     role: str
 
+    department_id: int | None
+
     is_active: bool
 
     model_config = {
-        "from_attributes": True
+        "from_attributes": True,
     }

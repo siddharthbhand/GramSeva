@@ -15,6 +15,10 @@ from app.db.database import Base
 class Department(Base):
     __tablename__ = "departments"
 
+    # =====================================================
+    # Department Information
+    # =====================================================
+
     id = Column(
         Integer,
         primary_key=True,
@@ -49,11 +53,18 @@ class Department(Base):
         onupdate=func.now(),
     )
 
-    # ============================
+    # =====================================================
     # Relationships
-    # ============================
+    # =====================================================
 
+    # Complaints belonging to this department
     complaints = relationship(
         "Complaint",
+        back_populates="department",
+    )
+
+    # Users belonging to this department
+    users = relationship(
+        "User",
         back_populates="department",
     )

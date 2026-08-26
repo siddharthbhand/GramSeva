@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.dependencies.roles import require_admin
 from app.dependencies.auth import get_current_user
+from app.dependencies.roles import require_admin
 
 from app.models.user import User
 
@@ -20,6 +20,10 @@ from app.schemas.complaint import (
 
 from app.services.complaint_service import ComplaintService
 
+
+# =====================================================
+# Router
+# =====================================================
 
 router = APIRouter(
     prefix="/complaints",
@@ -48,7 +52,7 @@ def create_complaint(
 
 
 # =====================================================
-# Get All Complaints
+# Get Complaints
 # =====================================================
 
 @router.get(
@@ -57,8 +61,12 @@ def create_complaint(
 )
 def get_all_complaints(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return ComplaintService.get_all_complaints(db)
+    return ComplaintService.get_all_complaints(
+        db=db,
+        current_user=current_user,
+    )
 
 
 # =====================================================
@@ -109,8 +117,12 @@ def get_my_complaint_by_id(
 )
 def get_all_complaints_sla(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return ComplaintService.get_all_complaints_sla(db)
+    return ComplaintService.get_all_complaints_sla(
+        db=db,
+        current_user=current_user,
+    )
 
 
 # =====================================================
@@ -123,8 +135,12 @@ def get_all_complaints_sla(
 )
 def get_near_breach_complaints(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return ComplaintService.get_near_breach_complaints(db)
+    return ComplaintService.get_near_breach_complaints(
+        db=db,
+        current_user=current_user,
+    )
 
 
 # =====================================================
@@ -137,8 +153,12 @@ def get_near_breach_complaints(
 )
 def get_breached_complaints(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return ComplaintService.get_breached_complaints(db)
+    return ComplaintService.get_breached_complaints(
+        db=db,
+        current_user=current_user,
+    )
 
 
 # =====================================================
@@ -152,10 +172,12 @@ def get_breached_complaints(
 def get_complaint_by_id(
     complaint_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return ComplaintService.get_complaint_by_id(
-        db,
-        complaint_id,
+        db=db,
+        complaint_id=complaint_id,
+        current_user=current_user,
     )
 
 
@@ -171,12 +193,13 @@ def update_complaint(
     complaint_id: int,
     complaint_data: ComplaintUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
     return ComplaintService.update_complaint(
-        db,
-        complaint_id,
-        complaint_data,
+        db=db,
+        complaint_id=complaint_id,
+        complaint_data=complaint_data,
+        current_user=current_user,
     )
 
 
@@ -192,13 +215,13 @@ def update_complaint_status(
     complaint_id: int,
     status_data: ComplaintStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
     return ComplaintService.update_complaint_status(
         db=db,
         complaint_id=complaint_id,
         status_data=status_data,
-        changed_by=current_user.id,
+        current_user=current_user,
     )
 
 
@@ -206,13 +229,15 @@ def update_complaint_status(
 # Delete Complaint
 # =====================================================
 
-@router.delete("/{complaint_id}")
+@router.delete(
+    "/{complaint_id}",
+)
 def delete_complaint(
     complaint_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
     return ComplaintService.delete_complaint(
-        db,
-        complaint_id,
+        db=db,
+        complaint_id=complaint_id,
     )
