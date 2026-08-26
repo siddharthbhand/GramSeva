@@ -7,6 +7,7 @@ from app.core.security import (
     verify_password,
     create_access_token,
 )
+from app.core.user_roles import UserRole
 
 
 class AuthService:
@@ -66,13 +67,17 @@ class AuthService:
         # -------------------------------------------------
         # Create User
         # -------------------------------------------------
+        # Public registration always creates a citizen.
+        # Admin/officer/department-head accounts must be
+        # managed through authorized admin operations.
 
         new_user = User(
             full_name=user_data.full_name,
             email=user_data.email,
             phone=user_data.phone,
             password=hashed_password,
-            role=user_data.role.value,
+            role=UserRole.CITIZEN.value,
+            department_id=None,
         )
 
         db.add(new_user)
@@ -121,6 +126,15 @@ class AuthService:
         ):
             raise ValueError(
                 "Invalid email or password."
+            )
+
+        # -------------------------------------------------
+        # Check Active Account
+        # -------------------------------------------------
+
+        if not user.is_active:
+            raise ValueError(
+                "User account is inactive."
             )
 
         # -------------------------------------------------

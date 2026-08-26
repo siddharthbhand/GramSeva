@@ -1,14 +1,16 @@
 from pydantic import BaseModel, EmailStr, Field
 
-from app.core.user_roles import UserRole
-
 
 class UserRegister(BaseModel):
     """
-    Schema for user registration.
+    Schema for public citizen registration.
     """
 
-    full_name: str = Field(..., min_length=3, max_length=100)
+    full_name: str = Field(
+        ...,
+        min_length=3,
+        max_length=100,
+    )
 
     email: EmailStr
 
@@ -21,10 +23,6 @@ class UserRegister(BaseModel):
     password: str = Field(
         ...,
         min_length=8,
-    )
-
-    role: UserRole = Field(
-        default=UserRole.CITIZEN,
     )
 
 
@@ -52,5 +50,5 @@ class UserResponse(BaseModel):
     role: str
 
     model_config = {
-        "from_attributes": True
+        "from_attributes": True,
     }

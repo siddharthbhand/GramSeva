@@ -6,13 +6,20 @@ from app.db.database import get_db
 from app.models.user import User
 from app.core.security import decode_access_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/auth/login",
+)
 
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
+    """
+    Return the currently authenticated and active user.
+    """
+
     payload = decode_access_token(token)
 
     if payload is None:
@@ -29,9 +36,19 @@ def get_current_user(
             detail="Invalid token payload.",
         )
 
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user identifier in token.",
+        )
+
     user = (
         db.query(User)
-        .filter(User.id == int(user_id))
+        .filter(
+            User.id == user_id,
+        )
         .first()
     )
 
@@ -39,6 +56,16 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found.",
+        )
+
+    # -------------------------------------------------
+    # Block deactivated users
+    # -------------------------------------------------
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive.",
         )
 
     return user
