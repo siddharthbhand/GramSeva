@@ -5,6 +5,10 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 
 
+# =====================================================
+# Database URL
+# =====================================================
+
 DATABASE_URL = URL.create(
     drivername="mysql+pymysql",
     username=settings.DB_USER,
@@ -15,24 +19,41 @@ DATABASE_URL = URL.create(
 )
 
 
+# =====================================================
+# Database Engine
+# =====================================================
+
 engine = create_engine(
     DATABASE_URL,
-    echo=True
+    echo=False,
 )
 
+
+# =====================================================
+# Database Session
+# =====================================================
 
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
-    bind=engine
+    bind=engine,
 )
 
+
+# =====================================================
+# Base Model
+# =====================================================
 
 Base = declarative_base()
 
 
+# =====================================================
+# Database Dependency
+# =====================================================
+
 def get_db():
     db = SessionLocal()
+
     try:
         yield db
     finally:

@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
@@ -25,20 +27,6 @@ from app.api.notification import (
 )
 
 from app.core.config import settings
-from app.db.database import Base, engine
-
-
-# =====================================================
-# Import All Models
-# =====================================================
-
-from app.models.user import User
-from app.models.department import Department
-from app.models.complaint import Complaint
-from app.models.complaint_assignment import ComplaintAssignment
-from app.models.complaint_history import ComplaintHistory
-from app.models.complaint_escalation import ComplaintEscalation
-from app.models.notification import Notification
 
 
 # =====================================================
@@ -52,10 +40,37 @@ app = FastAPI(
 
 
 # =====================================================
-# Create Database Tables
+# Global Database Error Handler
 # =====================================================
 
-Base.metadata.create_all(bind=engine)
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(
+    request: Request,
+    exc: SQLAlchemyError,
+):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "A database error occurred. Please try again later."
+        },
+    )
+
+
+# =====================================================
+# Global Unexpected Error Handler
+# =====================================================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(
+    request: Request,
+    exc: Exception,
+):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "An unexpected server error occurred. Please try again later."
+        },
+    )
 
 
 # =====================================================
@@ -152,6 +167,10 @@ def home():
     }
 
 
+# =====================================================
+# Environment Check
+# =====================================================
+
 @app.get("/check-env")
 def check_env():
     return {
@@ -159,9 +178,12 @@ def check_env():
         "port": settings.DB_PORT,
         "database": settings.DB_NAME,
         "user": settings.DB_USER,
-        "password": settings.DB_PASSWORD,
     }
 
+
+# =====================================================
+# Database Health Check
+# =====================================================
 
 @app.get("/test-db")
 def test_db():
