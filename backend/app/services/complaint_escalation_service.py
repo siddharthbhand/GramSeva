@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.models.complaint import Complaint
 from app.models.complaint_escalation import ComplaintEscalation
-from app.models.complaint_assignment import ComplaintAssignment
 from app.models.notification import Notification
 from app.models.user import User
 
@@ -53,28 +52,6 @@ class ComplaintEscalationService:
             )
 
         # -------------------------------------------------
-        # Check Escalated User
-        # -------------------------------------------------
-
-        if escalation_data.escalated_to is not None:
-
-            escalated_user = (
-                db.query(User)
-                .filter(
-                    User.id == escalation_data.escalated_to,
-                    User.is_active == True,
-                )
-                .first()
-            )
-
-            if not escalated_user:
-
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Escalation target user not found.",
-                )
-
-        # -------------------------------------------------
         # Check Escalating User
         # -------------------------------------------------
 
@@ -119,6 +96,72 @@ class ComplaintEscalationService:
         else:
 
             escalation_level = 1
+
+        # -------------------------------------------------
+        # Validate Escalation Level
+        # -------------------------------------------------
+
+        expected_role = (
+            EscalationHierarchyService.get_target_role(
+                escalation_level
+            )
+        )
+
+        if expected_role is None:
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "No further escalation is available "
+                    "for this complaint."
+                ),
+            )
+
+        # -------------------------------------------------
+        # Check Escalated User
+        # -------------------------------------------------
+
+        escalated_user = None
+
+        if escalation_data.escalated_to is not None:
+
+            escalated_user = (
+                db.query(User)
+                .filter(
+                    User.id == escalation_data.escalated_to,
+                    User.is_active == True,
+                )
+                .first()
+            )
+
+            if not escalated_user:
+
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Escalation target user not found.",
+                )
+
+            # -------------------------------------------------
+            # Validate Target Against Hierarchy
+            # -------------------------------------------------
+
+            if not (
+                EscalationHierarchyService
+                .is_valid_escalation_target(
+                    user=escalated_user,
+                    escalation_level=escalation_level,
+                    department_id=complaint.department_id,
+                )
+            ):
+
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Selected escalation target is not "
+                        "eligible for this escalation level "
+                        "or complaint department."
+                    ),
+                )
 
         # -------------------------------------------------
         # Create Escalation
@@ -381,6 +424,43 @@ class ComplaintEscalationService:
             )
 
         # -------------------------------------------------
+        # Check Complaint
+        # -------------------------------------------------
+
+        complaint = (
+            db.query(Complaint)
+            .filter(
+                Complaint.id == escalation.complaint_id,
+                Complaint.is_active == True,
+            )
+            .first()
+        )
+
+        if not complaint:
+
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Complaint not found.",
+            )
+
+        # -------------------------------------------------
+        # Validate Escalation Level
+        # -------------------------------------------------
+
+        expected_role = (
+            EscalationHierarchyService.get_target_role(
+                escalation_data.escalation_level
+            )
+        )
+
+        if expected_role is None:
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid escalation level.",
+            )
+
+        # -------------------------------------------------
         # Validate Escalation Target
         # -------------------------------------------------
 
@@ -400,6 +480,26 @@ class ComplaintEscalationService:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Escalation target user not found.",
+                )
+
+            if not (
+                EscalationHierarchyService
+                .is_valid_escalation_target(
+                    user=escalated_user,
+                    escalation_level=(
+                        escalation_data.escalation_level
+                    ),
+                    department_id=complaint.department_id,
+                )
+            ):
+
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Selected escalation target is not "
+                        "eligible for this escalation level "
+                        "or complaint department."
+                    ),
                 )
 
         # -------------------------------------------------

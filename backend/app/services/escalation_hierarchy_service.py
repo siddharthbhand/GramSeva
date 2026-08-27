@@ -66,7 +66,10 @@ class EscalationHierarchyService:
         # Maximum escalation level reached
         # -------------------------------------------------
 
-        if next_level not in EscalationHierarchyService.ESCALATION_HIERARCHY:
+        if (
+            next_level
+            not in EscalationHierarchyService.ESCALATION_HIERARCHY
+        ):
             return None
 
         return next_level
@@ -98,13 +101,16 @@ class EscalationHierarchyService:
     def get_escalation_target(
         db: Session,
         escalation_level: int,
+        department_id: Optional[int] = None,
     ) -> Optional[User]:
         """
         Find an active user who is eligible to receive
-        the escalation for the requested level.
+        the escalation.
 
-        Level 1 -> Department Head
-        Level 2 -> Admin
+        Level 1 -> Department Head of the complaint department
+        Level 2 -> Active Admin
+
+        Department matching is required for Level 1.
         """
 
         target_role = (
@@ -116,19 +122,47 @@ class EscalationHierarchyService:
         if target_role is None:
             return None
 
-        target_user = (
-            db.query(User)
-            .filter(
-                User.role == target_role,
-                User.is_active == True,
-            )
-            .order_by(
-                User.id.asc()
-            )
-            .first()
-        )
+        # -------------------------------------------------
+        # Level 1 -> Department Head
+        # -------------------------------------------------
 
-        return target_user
+        if escalation_level == 1:
+
+            if department_id is None:
+                return None
+
+            return (
+                db.query(User)
+                .filter(
+                    User.role == target_role,
+                    User.is_active == True,
+                    User.department_id == department_id,
+                )
+                .order_by(
+                    User.id.asc()
+                )
+                .first()
+            )
+
+        # -------------------------------------------------
+        # Level 2 -> Admin
+        # -------------------------------------------------
+
+        if escalation_level == 2:
+
+            return (
+                db.query(User)
+                .filter(
+                    User.role == target_role,
+                    User.is_active == True,
+                )
+                .order_by(
+                    User.id.asc()
+                )
+                .first()
+            )
+
+        return None
 
     # =====================================================
     # Get Next Escalation Target
@@ -138,6 +172,7 @@ class EscalationHierarchyService:
     def get_next_escalation_target(
         db: Session,
         complaint_id: int,
+        department_id: Optional[int] = None,
     ) -> Tuple[
         Optional[int],
         Optional[User],
@@ -145,6 +180,8 @@ class EscalationHierarchyService:
         """
         Determine both the next escalation level and
         the user who should receive the escalation.
+
+        Level 1 requires a valid complaint department.
 
         Returns:
 
@@ -177,6 +214,7 @@ class EscalationHierarchyService:
             .get_escalation_target(
                 db=db,
                 escalation_level=next_level,
+                department_id=department_id,
             )
         )
 
@@ -193,10 +231,18 @@ class EscalationHierarchyService:
     def is_valid_escalation_target(
         user: Optional[User],
         escalation_level: int,
+        department_id: Optional[int] = None,
     ) -> bool:
         """
         Validate whether a user is eligible to receive
         an escalation at the requested level.
+
+        Level 1:
+            User must be an active Department Head
+            belonging to the complaint's department.
+
+        Level 2:
+            User must be an active Admin.
         """
 
         if user is None:
@@ -215,7 +261,22 @@ class EscalationHierarchyService:
         if expected_role is None:
             return False
 
-        return user.role == expected_role
+        if user.role != expected_role:
+            return False
+
+        # -------------------------------------------------
+        # Level 1 Department Validation
+        # -------------------------------------------------
+
+        if escalation_level == 1:
+
+            if department_id is None:
+                return False
+
+            if user.department_id != department_id:
+                return False
+
+        return True
 
     # =====================================================
     # Get Hierarchy Information

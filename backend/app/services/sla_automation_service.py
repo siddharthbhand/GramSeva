@@ -416,12 +416,13 @@ class SLAAutomationService:
         Create an automatic escalation using the configured
         escalation hierarchy.
 
-        Level 1 -> Department Head
+        Level 1 -> Department Head of complaint department
         Level 2 -> Admin
 
         Returns None when:
         - no next level exists
         - no eligible target exists
+        - Level 1 complaint has no department
         """
 
         (
@@ -432,6 +433,7 @@ class SLAAutomationService:
             .get_next_escalation_target(
                 db=db,
                 complaint_id=complaint.id,
+                department_id=complaint.department_id,
             )
         )
 
@@ -446,6 +448,7 @@ class SLAAutomationService:
             .is_valid_escalation_target(
                 user=target_user,
                 escalation_level=next_level,
+                department_id=complaint.department_id,
             )
         ):
             return None
