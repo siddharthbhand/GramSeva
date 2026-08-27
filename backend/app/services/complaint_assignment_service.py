@@ -9,6 +9,7 @@ from app.models.user import User
 
 from app.schemas.complaint_assignment import (
     ComplaintAssignmentCreate,
+    ComplaintAssignmentUpdate,
 )
 
 
@@ -254,15 +255,20 @@ class ComplaintAssignmentService:
         return assignment
 
     # =====================================================
-    # Update Assignment
+    # Update / Reassign Assignment
     # =====================================================
 
     @staticmethod
     def update_assignment(
         db: Session,
         assignment_id: int,
-        remarks: str,
+        assignment_data: ComplaintAssignmentUpdate,
+        assigned_by: int,
     ):
+
+        # -------------------------------------------------
+        # Get Existing Active Assignment
+        # -------------------------------------------------
 
         assignment = (
             ComplaintAssignmentService.get_assignment_by_id(
@@ -271,7 +277,182 @@ class ComplaintAssignmentService:
             )
         )
 
-        assignment.remarks = remarks
+        # -------------------------------------------------
+        # Get Complaint
+        # -------------------------------------------------
+
+        complaint = (
+            db.query(Complaint)
+            .filter(
+                Complaint.id == assignment.complaint_id,
+                Complaint.is_active == True,
+            )
+            .first()
+        )
+
+        if not complaint:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Complaint not found.",
+            )
+
+        # =================================================
+        # Reassignment
+        # =================================================
+
+        if assignment_data.officer_id is not None:
+
+            # ---------------------------------------------
+            # Check New Officer
+            # ---------------------------------------------
+
+            officer = (
+                db.query(User)
+                .filter(
+                    User.id == assignment_data.officer_id,
+                    User.is_active == True,
+                )
+                .first()
+            )
+
+            if not officer:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Officer not found.",
+                )
+
+            # ---------------------------------------------
+            # Validate Officer Role
+            # ---------------------------------------------
+
+            if officer.role != "officer":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Selected user is not an officer.",
+                )
+
+            # ---------------------------------------------
+            # Complaint Must Have Department
+            # ---------------------------------------------
+
+            if complaint.department_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Complaint has no department assigned.",
+                )
+
+            # ---------------------------------------------
+            # Validate Officer Department
+            # ---------------------------------------------
+
+            if officer.department_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Officer is not assigned to a department.",
+                )
+
+            # ---------------------------------------------
+            # Check Officer Department Is Active
+            # ---------------------------------------------
+
+            officer_department = (
+                db.query(Department)
+                .filter(
+                    Department.id == officer.department_id,
+                    Department.is_active == True,
+                )
+                .first()
+            )
+
+            if not officer_department:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Officer department not found or inactive.",
+                )
+
+            # ---------------------------------------------
+            # Validate Same Department
+            # ---------------------------------------------
+
+            if officer.department_id != complaint.department_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Officer does not belong to the "
+                        "complaint's department."
+                    ),
+                )
+
+            # ---------------------------------------------
+            # Prevent Same Officer Reassignment
+            # ---------------------------------------------
+
+            if officer.id == assignment.officer_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Complaint is already assigned to this officer."
+                    ),
+                )
+
+            # ---------------------------------------------
+            # Deactivate Previous Assignment
+            # ---------------------------------------------
+
+            assignment.is_active = False
+
+            # ---------------------------------------------
+            # Create New Assignment
+            # ---------------------------------------------
+
+            new_assignment = ComplaintAssignment(
+                complaint_id=assignment.complaint_id,
+                officer_id=officer.id,
+                assigned_by=assigned_by,
+                remarks=assignment_data.remarks,
+            )
+
+            db.add(new_assignment)
+
+            # ---------------------------------------------
+            # Create Reassignment Notification
+            # ---------------------------------------------
+
+            notification = Notification(
+                user_id=officer.id,
+                complaint_id=assignment.complaint_id,
+                escalation_id=None,
+                title="Complaint Reassigned",
+                message=(
+                    f"Complaint #{assignment.complaint_id} "
+                    "has been reassigned to you for further action."
+                ),
+                notification_type="COMPLAINT_REASSIGNED",
+                is_read=False,
+                is_active=True,
+            )
+
+            db.add(notification)
+
+            # ---------------------------------------------
+            # Commit
+            # ---------------------------------------------
+
+            db.commit()
+
+            db.refresh(new_assignment)
+
+            return new_assignment
+
+        # =================================================
+        # Remarks / Active Status Update
+        # =================================================
+
+        if assignment_data.remarks is not None:
+            assignment.remarks = assignment_data.remarks
+
+        if assignment_data.is_active is not None:
+            assignment.is_active = assignment_data.is_active
 
         db.commit()
         db.refresh(assignment)

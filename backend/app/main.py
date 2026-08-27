@@ -1,4 +1,8 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -9,24 +13,88 @@ from app.api.complaints import router as complaint_router
 from app.api.admin_analytics import (
     router as admin_analytics_router,
 )
-
 from app.api.complaint_assignments import (
     router as complaint_assignment_router,
 )
-
 from app.api.complaint_history import (
     router as complaint_history_router,
 )
-
 from app.api.complaint_escalation import (
     router as complaint_escalation_router,
 )
-
 from app.api.notification import (
     router as notification_router,
 )
 
 from app.core.config import settings
+from app.db.database import SessionLocal
+from app.services.sla_automation_service import (
+    SLAAutomationService,
+)
+
+
+# =====================================================
+# SLA Monitoring Configuration
+# =====================================================
+
+SLA_MONITOR_INTERVAL_SECONDS = 300
+
+
+# =====================================================
+# SLA Background Monitor
+# =====================================================
+
+async def sla_monitor_loop():
+    """
+    Periodically process SLA near-breach warnings
+    and automatic SLA breach escalations.
+    """
+
+    while True:
+
+        db = SessionLocal()
+
+        try:
+            SLAAutomationService.process_near_breach_complaints(
+                db=db,
+            )
+
+            SLAAutomationService.process_breached_complaints(
+                db=db,
+            )
+
+        except Exception:
+            db.rollback()
+
+        finally:
+            db.close()
+
+        await asyncio.sleep(
+            SLA_MONITOR_INTERVAL_SECONDS
+        )
+
+
+# =====================================================
+# Application Lifespan
+# =====================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    monitor_task = asyncio.create_task(
+        sla_monitor_loop()
+    )
+
+    try:
+        yield
+
+    finally:
+        monitor_task.cancel()
+
+        try:
+            await monitor_task
+        except asyncio.CancelledError:
+            pass
 
 
 # =====================================================
@@ -36,6 +104,22 @@ from app.core.config import settings
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
+    lifespan=lifespan,
+)
+
+
+# =====================================================
+# CORS Configuration
+# =====================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        settings.FRONTEND_URL,
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -51,7 +135,10 @@ async def sqlalchemy_exception_handler(
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "A database error occurred. Please try again later."
+            "detail": (
+                "A database error occurred. "
+                "Please try again later."
+            )
         },
     )
 
@@ -68,7 +155,10 @@ async def global_exception_handler(
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "An unexpected server error occurred. Please try again later."
+            "detail": (
+                "An unexpected server error occurred. "
+                "Please try again later."
+            )
         },
     )
 
